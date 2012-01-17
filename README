@@ -1,0 +1,206 @@
+------------------------------------------------------------------------
+  ABOUT THE FIELD3D PLUGIN FOR MAYA
+------------------------------------------------------------------------
+
+Field3D is an open source library for storing voxel data developed 
+originaly at Sony Pictures Imageworks. It provides C++ classes that 
+handle in-memory storage and a file format based on HDF5 that 
+allows the C++ objects to be written to and read from disk.
+
+This plugin aims to integrate Field3D into Maya. The main benefits
+of using field3d are:
+	- open format supported in several softwares ( especially
+	  Houdini)
+	- efficient memory compression by using sparse Field in either 
+	  float or half type.
+	- handling of huge amount of voxel thanks to the use of Hdf5 
+	  under the hood.
+      
+More information about Field3D can be found at: 
+	http://sites.google.com/site/field3d/
+	http://code.google.com/p/field3d/
+
+------------------------------------------------------------------------
+  LICENSE
+------------------------------------------------------------------------
+
+The plugin source code is distributed under the "New BSD" license.
+See the file called COPYING for details.
+
+------------------------------------------------------------------------
+  PLUGIN DEPENDENCIES
+------------------------------------------------------------------------
+
+This Plugin was originally developed under Fedora 13 (Goddard) for 
+Maya 2011(sp1). It has been tested with gcc 4.1.2 and maya 2011(sp1).
+
+The libraries required for this plugin are:
+
+  IlmBase  ( 1.0.2 )
+  HDF5     ( 1.8.7 )
+  Field3D  ( 1.2.0 )
+  maya SDK ( 2011  )
+
+Other versions of these libraries might work, but they haven't been 
+tested yet.
+
+The make system used by this plugin is cmake ( http://www.cmake.org/ ).
+
+But it might be also possible to create easily your own Makefile. In this
+case, have a look at the CMakeLists.txt .  
+
+More information about HDF5 can be found at: 
+  http://www.hdfgroup.org/HDF5/
+
+More information about IlmBase/OpenEXR can be found at: 
+  http://www.openexr.com/
+
+More information about Field3D can be found at: 
+  http://sites.google.com/site/field3d
+
+
+------------------------------------------------------------------------
+  BUILDING THIS PLUGIN
+------------------------------------------------------------------------
+
+This plugin was originally developed under Fedora 13 (Goddard) and 
+gcc 4.1.2
+
+The make system used by this plugin is cmake ( http://www.cmake.org/ ).
+
+It is mandatory to use gcc 4.1.2 if you intend to compile the plugin for
+maya 2011(sp1). Other version of maya haven't been tested yet.
+
+To build the plugin, go to the plugin directory and type :
+	$ ccmake ./CMakeLists.txt 
+
+You can specify the compiler you want to use while invoking 
+cmake this way:
+	$ ccmake ./CMakeLists.txt -DCMAKE_C_COMPILER=/path/to/gcc 
+	  -DCMAKE_CXX_COMPILER=/path/to/g++ 
+
+You have to specify four paths :
+	FIELD3D_ROOT_DIR
+	HDF5_ROOT_DIR
+	ILMBASE_ROOT_DIR
+	MAYA_ROOT_DIR
+
+In each of those root paths must reside a "lib" and an "include" 
+directory. They will be found automatically. 
+
+Alternatively, you can invoke ccmake with arguments in a script :
+	
+	#!/bin/sh
+	ccmake \ 
+	./CMakeLists.txt \
+	-DFIELD3D_ROOT_DIR=/path/to/field3D \
+	-DHDF5_ROOT_DIR=/path/to/hdf5 \
+	-DILMBASE_ROOT_DIR=/path/to/ilmbase \
+	-DMAYA_ROOT_DIR=/path/to/maya
+	  
+This will build a shared library (*.so), that you can load with the Maya 
+Plugin Manager. By default an optimized/release build is created.
+
+You can output log messages on the console by compiling in debug mode.
+If you don't want any log message, add -DNDEBUG to CMAKE_CXX_FLAGS in
+cmake advanced mode.
+
+You can link statically or dynamically to the required libraries.
+Static link is probably the prefered way, as it is simple to deploy. 
+If you choose to link dynamically, be sure to set your LD_LIBRARY_PATH 
+to those directories before launchin Maya :
+	/path/to/field3D/lib
+	/path/to/hdf5/lib 
+	/path/to/ilmbase/lib
+	/path/to/maya/lib
+	/path/to/boost/lib ( needed by field3D )
+
+Finally, if you are concerned by the performance of the cache format , 
+you could turn off the gzip compression used by default in Field3D by
+modifiying the function "bool checkHdf5Gzip()" in Hdf5Util.cpp :
+
+	bool checkHdf5Gzip()
+	{
+	  // manually disabled for performance reasons.
+	  printf("checkHdf5Gzip disabled\n");
+	  return false;
+	  
+	  /* comment the original function
+	  htri_t avail = H5Zfilter_avail(H5Z_FILTER_DEFLATE);
+	  if (!avail)
+	    return false;
+	
+	  unsigned int filter_info;
+	  herr_t status = H5Zget_filter_info (H5Z_FILTER_DEFLATE, &filter_info);
+	
+	  if (status < 0)
+	    return false;
+	
+	  if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) ||
+	      !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+	    return false;
+	  }
+	
+	  return true;
+	*/
+	}  
+
+Our benchmarks have shown a important improvement in term of speed
+( but obviously not in term of storage usage). 
+
+------------------------------------------------------------------------
+  USING THE PLUGIN
+------------------------------------------------------------------------
+Once the library is compiled, open Maya and load it with  Windows -> Settings/
+Preferences -> Plugin Manager.
+
+Create a scene with a fluid. Then go to Fluid nCache -> Create New 
+Cache (advanced tab) -> Cache format. Now you can choose between different 
+kind of field3d formats.
+
+The plugin currently supports two types of fields:
+	- Dense fields are similar to .mcc format : Values are stored in 
+	  a regular grid.
+	- Sparse fields are different from dense fields primarily in that 
+	  they don't allocate space for voxels until they are actually in use
+	  
+Thus in many cases sparse fields require less memory on disk than a regular 
+dense field. A sparse field use a threshold to ignore part of the data which
+are not meaningful. It is currently set to 0.0000001 which should suffice in 
+most cases. You can modify it in field3D_Tools.h if you need it: 
+	( const float SPARSE_THRESHOLD = 0.0000001 ; )  
+
+The plugin supports also two kind of type of data :
+    - float : floating point stored on 4 bytes
+    - half  : floating point stored on 2 bytes ( from IlmBase ) 
+    
+The data type is the internal representation of a single value ( density, 
+temperature, pressure, etc .) in the field.
+
+As a consequence, fields using half type require twice as less memory on disk 
+than their float counterparts. But keep in mind that half type can lead 
+to numerical inaccuracies as they are twice less precise than a float. 
+Use them with care ! 
+
+------------------------------------------------------------------------
+  CURRENT LIMITATIONS - FUTUR WORK 
+------------------------------------------------------------------------
+
+Sequence can't currently be saved into one single file. The methods 
+beginReadChunk(), endReadChunk(), beginWriteChunk(), and endWriteChunk()
+have still to be written. 
+
+------------------------------------------------------------------------
+  AUTHOR
+------------------------------------------------------------------------
+
+Original development at Prime Focus Film London:
+  Antoine P.
+
+
+------------------------------------------------------------------------
+  QUESTIONS AND COMMENTS
+------------------------------------------------------------------------
+
+For questions and/or comments, please feel free to send an email at :
+	git.magic.box@gmail.com
